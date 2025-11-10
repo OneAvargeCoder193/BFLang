@@ -46,7 +46,7 @@ class Builder:
 		self.context = Context(self.stackPos, parent=self.context)
 	
 	def whileEnd(self) -> None:
-		self.content += f"whileEnd:"
+		self.content += f"whileEnd: "
 		if self.stackPos != self.context.startPos:
 			self.content += f"\n\t{'<[-]' * (self.stackPos - self.context.startPos)}\n"
 			self.stackPos = self.context.startPos
@@ -91,7 +91,7 @@ class Builder:
 
 	def setLocal(self, name: str) -> None:
 		diff = self.stackPos - self.context.get(name)
-		self.content += f"set: <[-{'<' * diff}+{'>' * diff}]"
+		self.content += f"set: {'<' * diff}[-]{'>' * (diff - 1)}[-{'<' * (diff - 1)}+{'>' * (diff - 1)}]\n"
 		self.stackPos -= 1
 
 	def logicalNotEql(self) -> None:
@@ -99,9 +99,9 @@ class Builder:
 		self.logicalNot()
 
 	def getContent(self, compact: bool = False) -> str:
-		if self.stackPos != self.context.startPos:
-			self.content += f"{'<[-]' * (self.stackPos - self.context.startPos)}\n"
-			self.stackPos = self.context.startPos
+		# if self.stackPos != self.context.startPos:
+		# 	self.content += f"{'<[-]' * (self.stackPos - self.context.startPos)}\n"
+		# 	self.stackPos = self.context.startPos
 		if compact:
 			pattern = f"[^{re.escape('+-<>[],.')}]"
 			return re.sub(pattern, "", self.content)
@@ -125,13 +125,15 @@ output.getLocal("b")
 output.setLocal("a")
 
 output.dupe()
+output.dupe()
 output.setLocal("b")
 output.dumpNum()
 
 output.push(10)
 output.dump()
 
-output.push(1)
+output.push(233)
+output.logicalNotEql()
 output.whileEnd()
 
 with open("out.bf", "w") as file:

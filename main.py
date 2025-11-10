@@ -1,10 +1,24 @@
 import re
 
+class Context:
+	def __init__(self, startPos, parent=None):
+		self.startPos = startPos
+		self.parent = parent
+		self.locals = {}
+	
+	def get(self, name):
+		if name not in self.locals:
+			return self.parent.get(name)
+		return self.locals[name]
+
+	def put(self, name, value):
+		self.locals[name] = value
+
 class Builder:
 	def __init__(self):
 		self.content = ""
-		self.locals = {}
 		self.stackPos = 0
+		self.context = Context(self.stackPos)
 
 	# BASICS:
 	def push(self, val: int) -> None:
@@ -29,16 +43,15 @@ class Builder:
 
 	def whileStart(self) -> None:
 		self.content += f"whileStart: <[>\n"
+		self.context = Context(self.stackPos, parent=self.context)
 	
 	def whileEnd(self) -> None:
-		self.content += f"whileEnd: <]\n"
-	
-	def ifStart(self) -> None:
-		self.content += f"ifStart: <[>\n"
-	
-	def ifEnd(self) -> None:
-		self.content += f"ifEnd: <[-]]\n" # Must be in same location of stack as ifStart
-		self.stackPos -= 1
+		self.content += f"whileEnd:"
+		if self.stackPos != self.context.startPos:
+			self.content += f"\n\t{'<[-]' * (self.stackPos - self.context.startPos)}\n"
+			self.stackPos = self.context.startPos
+		self.content += "<]\n"
+		self.context = self.context.parent
 
 	def logicalEql(self) -> None:
 		self.content += f"eql: <<[->-<]+>[<->[-]]\n"
@@ -55,24 +68,40 @@ class Builder:
 		self.content += f"dump: <.[-]\n"
 		self.stackPos -= 1
 	
+	def dumpNum(self) -> None:
+		self.content += f"dump num: >++++++++++<<[->+>-[>+>>]>[+[-<+>]>+>>]<<<<<<]>>[-]>>>++++++++++<[->-[>+>>]>[+[-\n\t<+>]>+>>]<<<<<]>[-]>>[>++++++[-<++++++++>]<.<<+>+>[-]]<[<[->-<]++++++[->++++++++\n\t<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]\n\t<[-]\n"
+		self.stackPos -= 1
+	
 	def swap(self) -> None:
 		self.content += f"swap: <[->+<]<[->+<]>>[-<<+>>]\n"
 	
+	def dupe(self) -> None:
+		self.content += f"dupe: <[->+>+<<]>>[-<<+>>]\n"
+		self.stackPos += 1
+	
 	# COMPOUNDS:
 	def pushLocal(self, name: str, val: int) -> None:
-		self.locals[name] = self.stackPos
+		self.context.put(name, self.stackPos)
 		self.push(val)
 
 	def getLocal(self, name: str) -> None:
-		diff = self.stackPos - self.locals[name]
+		diff = self.stackPos - self.context.get(name)
 		self.content += f"get: {'<' * diff}[-{'>' * diff}+>+{'<' * diff}<]{'>' * diff}>[-{'<' * diff}<+{'>' * diff}>]\n"
 		self.stackPos += 1
+
+	def setLocal(self, name: str) -> None:
+		diff = self.stackPos - self.context.get(name)
+		self.content += f"set: <[-{'<' * diff}+{'>' * diff}]"
+		self.stackPos -= 1
 
 	def logicalNotEql(self) -> None:
 		self.logicalEql()
 		self.logicalNot()
 
 	def getContent(self, compact: bool = False) -> str:
+		if self.stackPos != self.context.startPos:
+			self.content += f"{'<[-]' * (self.stackPos - self.context.startPos)}\n"
+			self.stackPos = self.context.startPos
 		if compact:
 			pattern = f"[^{re.escape('+-<>[],.')}]"
 			return re.sub(pattern, "", self.content)
@@ -81,11 +110,29 @@ class Builder:
 
 output = Builder()
 
-output.pushLocal("x", 32)
-output.pushLocal("y", 33)
-output.getLocal("x")
-output.getLocal("y")
+output.pushLocal("a", 0)
+output.pushLocal("b", 1)
+output.push(1)
+
+output.whileStart()
+output.pop()
+
+output.getLocal("a")
+output.getLocal("b")
 output.add()
+
+output.getLocal("b")
+output.setLocal("a")
+
+output.dupe()
+output.setLocal("b")
+output.dumpNum()
+
+output.push(10)
+output.dump()
+
+output.push(1)
+output.whileEnd()
 
 with open("out.bf", "w") as file:
 	file.write(output.getContent(compact=False))

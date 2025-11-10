@@ -6,12 +6,12 @@ class Context:
 		self.parent = parent
 		self.locals = {}
 	
-	def get(self, name):
+	def get(self, name: str):
 		if name not in self.locals:
 			return self.parent.get(name)
 		return self.locals[name]
 
-	def put(self, name, value):
+	def put(self, name: str, value: int):
 		self.locals[name] = value
 
 class Builder:
